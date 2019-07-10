@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 
-	"golang.org/x/net/context/ctxhttp"
 	"golang.org/x/oauth2"
 )
 
@@ -45,28 +44,34 @@ func main() {
 	)
 	client := oauth2.NewClient(context.Background(), src)
 
-	ctx := context.Background()
 	var buf bytes.Buffer
 	q := query{Query: exampleQuery}
 	err := json.NewEncoder(&buf).Encode(q)
-	if err != nil {
-		fmt.Printf("could not encode: %v\n", err)
-	}
+	errorf(err)
 
-	res, err := ctxhttp.Post(ctx, client, githubLink, "application/json", &buf)
-	if err != nil {
-		fmt.Printf("could not encode: %v\n", err)
-	}
-	defer res.Body.Close()
+	req, err := http.NewRequest("POST", githubLink, &buf)
+	errorf(err)
+
+	req.Header.Set("Content-Type", "application/json")
+	res, err := client.Do(req)
+
 	if res.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(res.Body)
 		fmt.Printf("non-200 OK status code: %v body: %q\n", res.Status, body)
 		os.Exit(2)
 	}
+	defer res.Body.Close()
+
 	var out response
 	err = json.NewDecoder(res.Body).Decode(&out)
-	if err != nil {
-		fmt.Printf("could not encode: %v\n", err)
-	}
+	errorf(err)
+
 	fmt.Printf("response body: %s\n", out.Data)
+}
+
+func errorf(err error) {
+	if err != nil {
+		fmt.Printf("got an error: %v\n", err)
+		os.Exit(1)
+	}
 }
